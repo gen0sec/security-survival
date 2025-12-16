@@ -532,8 +532,19 @@
       </div>
 
       <!-- Shop -->
-      <div class="flex gap-2 pl-2">
-        <!-- WAF -->
+      <div class="flex gap-2 pl-2 flex-wrap">
+        <!-- Edge -->
+        <button id="tool-edge"
+          class="service-btn bg-gray-800 text-gray-200 p-2 rounded-lg w-16 h-16 flex flex-col items-center justify-center border border-transparent group relative overflow-hidden"
+          onclick="setTool('edge')">
+          <div class="absolute top-0 right-0 bg-green-900/80 text-green-400 text-[9px] px-1 rounded-bl font-mono">
+            $30
+          </div>
+          <div class="w-4 h-4 bg-teal-400 rounded mb-1 shadow-[0_0_10px_rgba(45,212,191,0.6)]"></div>
+          <span class="text-[10px] font-bold mt-1">Edge</span>
+        </button>
+
+        <!-- Firewall -->
         <button id="tool-waf"
           class="service-btn bg-gray-800 text-gray-200 p-2 rounded-lg w-16 h-16 flex flex-col items-center justify-center border border-transparent group relative overflow-hidden"
           onclick="setTool('waf')">
@@ -541,7 +552,40 @@
             $40
           </div>
           <div class="w-4 h-4 bg-purple-500 rounded-sm mb-1 shadow-[0_0_10px_rgba(168,85,247,0.6)]"></div>
-          <span class="text-[10px] font-bold mt-1">FW</span>
+          <span class="text-[10px] font-bold mt-1">Firewall</span>
+        </button>
+
+        <!-- Proxy -->
+        <button id="tool-alb"
+          class="service-btn bg-gray-800 text-gray-200 p-2 rounded-lg w-16 h-16 flex flex-col items-center justify-center border border-transparent group relative overflow-hidden"
+          onclick="setTool('alb')">
+          <div class="absolute top-0 right-0 bg-green-900/80 text-green-400 text-[9px] px-1 rounded-bl font-mono">
+            $50
+          </div>
+          <div class="w-4 h-4 bg-blue-500 rounded-sm mb-1 shadow-[0_0_10px_rgba(59,130,246,0.6)]"></div>
+          <span class="text-[10px] font-bold mt-1">Proxy</span>
+        </button>
+
+        <!-- Content Scanning -->
+        <button id="tool-content"
+          class="service-btn bg-gray-800 text-gray-200 p-2 rounded-lg w-16 h-16 flex flex-col items-center justify-center border border-transparent group relative overflow-hidden"
+          onclick="setTool('content')">
+          <div class="absolute top-0 right-0 bg-green-900/80 text-green-400 text-[9px] px-1 rounded-bl font-mono">
+            $55
+          </div>
+          <div class="w-4 h-4 bg-amber-400 rounded mb-1 shadow-[0_0_10px_rgba(251,191,36,0.6)]"></div>
+          <span class="text-[10px] font-bold mt-1 text-center leading-tight">Content</span>
+        </button>
+
+        <!-- Cyber Intelligence -->
+        <button id="tool-intel"
+          class="service-btn bg-gray-800 text-gray-200 p-2 rounded-lg w-16 h-16 flex flex-col items-center justify-center border border-transparent group relative overflow-hidden"
+          onclick="setTool('intel')">
+          <div class="absolute top-0 right-0 bg-green-900/80 text-green-400 text-[9px] px-1 rounded-bl font-mono">
+            $70
+          </div>
+          <div class="w-4 h-4 bg-violet-400 rounded mb-1 shadow-[0_0_10px_rgba(167,139,250,0.6)]"></div>
+          <span class="text-[10px] font-bold mt-1 text-center leading-tight">Intel</span>
         </button>
 
         <!-- SQS -->
@@ -555,16 +599,7 @@
           <span class="text-[10px] font-bold mt-1">Queue</span>
         </button>
 
-        <button id="tool-alb"
-          class="service-btn bg-gray-800 text-gray-200 p-2 rounded-lg w-16 h-16 flex flex-col items-center justify-center border border-transparent group relative overflow-hidden"
-          onclick="setTool('alb')">
-          <div class="absolute top-0 right-0 bg-green-900/80 text-green-400 text-[9px] px-1 rounded-bl font-mono">
-            $50
-          </div>
-          <div class="w-4 h-4 bg-blue-500 rounded-sm mb-1 shadow-[0_0_10px_rgba(59,130,246,0.6)]"></div>
-          <span class="text-[10px] font-bold mt-1">LB</span>
-        </button>
-
+        <!-- Compute -->
         <button id="tool-lambda"
           class="service-btn bg-gray-800 text-gray-200 p-2 rounded-lg w-16 h-16 flex flex-col items-center justify-center border border-transparent group relative overflow-hidden"
           onclick="setTool('lambda')">
@@ -575,6 +610,7 @@
           <span class="text-[10px] font-bold mt-1">Compute</span>
         </button>
 
+        <!-- Database -->
         <button id="tool-db"
           class="service-btn bg-gray-800 text-gray-200 p-2 rounded-lg w-16 h-16 flex flex-col items-center justify-center border border-transparent group relative overflow-hidden"
           onclick="setTool('db')">
@@ -584,7 +620,7 @@
           <div
             class="w-4 h-4 bg-red-600 rounded-sm mb-1 shadow-[0_0_10px_rgba(220,38,38,0.6)] border-b-2 border-red-800">
           </div>
-          <span class="text-[10px] font-bold mt-1">SQL DB</span>
+          <span class="text-[10px] font-bold mt-1">Database</span>
         </button>
 
         <!-- Cache -->
@@ -607,6 +643,17 @@
           </div>
           <div class="w-4 h-4 bg-emerald-500 rounded-full mb-1 shadow-[0_0_10px_rgba(16,185,129,0.6)]"></div>
           <span class="text-[10px] font-bold mt-1">Storage</span>
+        </button>
+
+        <!-- SIEM -->
+        <button id="tool-siem"
+          class="service-btn bg-gray-800 text-gray-200 p-2 rounded-lg w-16 h-16 flex flex-col items-center justify-center border border-transparent group relative overflow-hidden"
+          onclick="setTool('siem')">
+          <div class="absolute top-0 right-0 bg-green-900/80 text-green-400 text-[9px] px-1 rounded-bl font-mono">
+            $80
+          </div>
+          <div class="w-4 h-4 bg-cyan-300 rounded mb-1 shadow-[0_0_10px_rgba(103,232,249,0.6)]"></div>
+          <span class="text-[10px] font-bold mt-1">SIEM</span>
         </button>
       </div>
     </div>

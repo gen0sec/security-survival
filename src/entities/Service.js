@@ -19,11 +19,40 @@ class Service {
           ...materialProps,
         });
         break;
+      case "edge":
+        geo = new THREE.BoxGeometry(3.5, 1.2, 3.5);
+        mat = new THREE.MeshStandardMaterial({
+          color: CONFIG.colors.edge || 0x14b8a6,
+          ...materialProps,
+        });
+        break;
       case "alb":
+        // Proxy
         geo = new THREE.BoxGeometry(3, 1.5, 3);
         mat = new THREE.MeshStandardMaterial({
-          color: CONFIG.colors.alb,
+          color: CONFIG.colors.proxy || CONFIG.colors.alb,
           roughness: 0.1,
+        });
+        break;
+      case "content":
+        geo = new THREE.BoxGeometry(3.2, 1.2, 2.2);
+        mat = new THREE.MeshStandardMaterial({
+          color: CONFIG.colors.content || 0xf59e0b,
+          ...materialProps,
+        });
+        break;
+      case "intel":
+        geo = new THREE.ConeGeometry(1.5, 2.5, 6);
+        mat = new THREE.MeshStandardMaterial({
+          color: CONFIG.colors.intel || 0x8b5cf6,
+          ...materialProps,
+        });
+        break;
+      case "siem":
+        geo = new THREE.CylinderGeometry(1.6, 1.6, 1.5, 10);
+        mat = new THREE.MeshStandardMaterial({
+          color: CONFIG.colors.siem || 0x22d3ee,
+          ...materialProps,
         });
         break;
       case "compute":
@@ -67,7 +96,11 @@ class Service {
     this.mesh.position.copy(pos);
 
     if (type === "waf") this.mesh.position.y += 1;
+    else if (type === "edge") this.mesh.position.y += 0.6;
     else if (type === "alb") this.mesh.position.y += 0.75;
+    else if (type === "content") this.mesh.position.y += 0.8;
+    else if (type === "intel") this.mesh.position.y += 1.2;
+    else if (type === "siem") this.mesh.position.y += 0.9;
     else if (type === "compute") this.mesh.position.y += 1.5;
     else if (type === "s3") this.mesh.position.y += 0.75;
     else if (type === "cache") this.mesh.position.y += 0.75;

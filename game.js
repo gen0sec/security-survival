@@ -665,48 +665,29 @@ function updateFinancesDisplay() {
 
     // Expense categories - services with costs
     const serviceTypes = [
-        {
-            key: "waf",
-            label: "WAF",
-            color: "text-red-400",
-            cost: CONFIG.services.waf.cost,
-        },
-        {
-            key: "alb",
-            label: "ALB",
-            color: "text-blue-400",
-            cost: CONFIG.services.alb.cost,
-        },
+        { key: "waf", color: "text-red-400", cost: CONFIG.services.waf.cost },
+        { key: "alb", color: "text-blue-400", cost: CONFIG.services.alb.cost },
         {
             key: "compute",
-            label: "Compute",
             color: "text-green-400",
             cost: CONFIG.services.compute.cost,
         },
         {
             key: "db",
-            label: "Database",
             color: "text-yellow-400",
             cost: CONFIG.services.db.cost,
         },
         {
             key: "s3",
-            label: "S3",
             color: "text-purple-400",
             cost: CONFIG.services.s3.cost,
         },
         {
             key: "cache",
-            label: "Cache",
             color: "text-orange-400",
             cost: CONFIG.services.cache.cost,
         },
-        {
-            key: "sqs",
-            label: "SQS",
-            color: "text-cyan-400",
-            cost: CONFIG.services.sqs.cost,
-        },
+        { key: "sqs", color: "text-cyan-400", cost: CONFIG.services.sqs.cost },
     ];
 
     const repairPercent = CONFIG.survival.degradation?.repairCostPercent || 0.15;
@@ -722,10 +703,11 @@ function updateFinancesDisplay() {
             const value = f.expenses.byService[t.key] || 0;
             const count = f.expenses.countByService[t.key] || 0;
             const repairCost = Math.ceil(t.cost * repairPercent);
+            const label = CONFIG.services[t.key]?.name || t.key.toUpperCase();
             if (value > 0 || count > 0) {
                 hasServiceExpenses = true;
                 expenseHtml += `<div class="grid grid-cols-5 gap-1"><span class="${t.color
-                    }">${t.label
+                    }">${label
                     }</span><span class="text-center text-gray-500">${count}</span><span class="text-center text-gray-400">$${t.cost
                     }</span><span class="text-center text-yellow-400">$${repairCost}</span><span class="text-right text-gray-300">$${Math.floor(
                         value
@@ -986,9 +968,19 @@ function initInputHandlers() {
                 new Audio("assets/sounds/click-5.mp3").play();
             }
         } else if (
-            ["waf", "alb", "lambda", "db", "s3", "sqs", "cache"].includes(
-                STATE.activeTool
-            )
+            [
+                "waf",
+                "alb",
+                "lambda",
+                "db",
+                "s3",
+                "sqs",
+                "cache",
+                "edge",
+                "content",
+                "intel",
+                "siem",
+            ].includes(STATE.activeTool)
         ) {
             // Handle upgrades for compute, db, and cache
             if (
@@ -1016,6 +1008,10 @@ function initInputHandlers() {
                     s3: "s3",
                     sqs: "sqs",
                     cache: "cache",
+                    edge: "edge",
+                    content: "content",
+                    intel: "intel",
+                    siem: "siem",
                 };
                 createService(typeMap[STATE.activeTool], snapToGrid(i.pos));
             }
@@ -1913,21 +1909,25 @@ function createConnection(fromId, toId) {
     const t1 = from.type,
         t2 = to.type;
 
-    if (t1 === "internet" && (t2 === "waf" || t2 === "alb")) valid = true;
+    if (t1 === "internet" && (t2 === "waf" || t2 === "alb" || t2 === "edge"))
+        valid = true;
+    else if (t1 === "edge" && (t2 === "alb" || t2 === "waf")) valid = true;
     else if (t1 === "waf" && t2 === "alb") valid = true;
     else if (t1 === "waf" && t2 === "sqs") valid = true;
     else if (t1 === "sqs" && t2 === "alb") valid = true;
     else if (t1 === "alb" && t2 === "sqs") valid = true;
+    else if (t1 === "alb" && (t2 === "compute" || t2 === "waf" || t2 === "content" || t2 === "intel"))
+        valid = true;
     else if (t1 === "sqs" && t2 === "compute") valid = true;
-    else if (t1 === "alb" && t2 === "compute") valid = true;
     else if (t1 === "compute" && t2 === "cache") valid = true;
+    else if (t1 === "compute" && t2 === "siem") valid = true;
     else if (t1 === "cache" && (t2 === "db" || t2 === "s3")) valid = true;
     else if (t1 === "compute" && (t2 === "db" || t2 === "s3")) valid = true;
 
     if (!valid) {
         new Audio("assets/sounds/click-9.mp3").play();
         console.error(
-            "Invalid connection topology: WAF/ALB from Internet -> WAF -> ALB -> Compute -> (RDS/S3)"
+            "Invalid connection topology: Internet -> Firewall -> Load Balancer -> Compute -> (DB/S3)"
         );
         return;
     }
@@ -2216,9 +2216,19 @@ container.addEventListener("mousedown", (e) => {
             new Audio("assets/sounds/click-5.mp3").play();
         }
     } else if (
-        ["waf", "alb", "lambda", "db", "s3", "sqs", "cache"].includes(
-            STATE.activeTool
-        )
+        [
+            "waf",
+            "alb",
+            "lambda",
+            "db",
+            "s3",
+            "sqs",
+            "cache",
+            "edge",
+            "content",
+            "intel",
+            "siem",
+        ].includes(STATE.activeTool)
     ) {
         // Handle upgrades for compute, db, and cache
         if (
@@ -2246,6 +2256,10 @@ container.addEventListener("mousedown", (e) => {
                 s3: "s3",
                 sqs: "sqs",
                 cache: "cache",
+                edge: "edge",
+                content: "content",
+                intel: "intel",
+                siem: "siem",
             };
             createService(typeMap[STATE.activeTool], snapToGrid(i.pos));
         }
@@ -2464,7 +2478,7 @@ function showTooltip(x, y, html) {
 
 // Setup UI tooltips
 function setupUITooltips() {
-    const tools = ["waf", "sqs", "alb", "lambda", "db", "cache", "s3"];
+    const tools = ["edge", "waf", "alb", "content", "intel", "sqs", "lambda", "db", "cache", "s3", "siem"];
     tools.forEach((toolId) => {
         const btn = document.getElementById(`tool-${toolId}`);
         if (!btn) return;
@@ -2906,8 +2920,8 @@ function analyzeFailure() {
 
         if (maliciousFailures > totalFailures * 0.3) {
             result.description = `Too many malicious requests got through (${maliciousFailures} attacks passed). Each unblocked attack costs -5 reputation.`;
-            result.tips.push("Add a WAF (Firewall) as your first line of defense");
-            result.tips.push("Multiple WAFs can handle traffic spikes better");
+            result.tips.push("Add a Firewall as your first line of defense");
+            result.tips.push("Multiple Firewalls can handle traffic spikes better");
         } else {
             const worstFailure = Object.entries(STATE.failures)
                 .filter(([k]) => k !== "MALICIOUS")
@@ -2958,12 +2972,12 @@ function analyzeFailure() {
 
         result.tips.push("Focus on processing more requests to increase income");
         result.tips.push("Use Cache to speed up request processing");
-        result.tips.push("Cheaper services (WAF, S3) have lower upkeep");
+        result.tips.push("Cheaper services (Firewall, S3) have lower upkeep");
     }
 
     // Add general tips based on game state
     if (STATE.services.length < 3) {
-        result.tips.push("Build a complete pipeline: WAF → ALB → Compute → DB/S3");
+        result.tips.push("Build a complete pipeline: Firewall → Load Balancer → Compute → DB/S3");
     }
 
     if (!STATE.services.some((s) => s.type === "cache")) {
