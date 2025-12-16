@@ -3357,3 +3357,42 @@ function renderLeaderboard(scores) {
     list.appendChild(el);
   });
 }
+
+// SETTINGS FUNCTIONS
+const OPENAI_KEY_STORAGE = "openai_api_key";
+
+function openSettings() {
+  const modal = document.getElementById("settings-modal");
+  const input = document.getElementById("openai-key-input");
+  const savedKey = localStorage.getItem(OPENAI_KEY_STORAGE);
+
+  if (savedKey) {
+    input.value = savedKey;
+  }
+
+  modal.classList.remove("hidden");
+}
+
+function closeSettings() {
+  document.getElementById("settings-modal").classList.add("hidden");
+}
+
+function saveSettings() {
+  const input = document.getElementById("openai-key-input");
+  const key = input.value.trim();
+
+  if (!key.startsWith("sk-")) {
+    alert("Please enter a valid OpenAI API key.");
+    return;
+  }
+
+  localStorage.setItem(OPENAI_KEY_STORAGE, key);
+
+  const feedback = document.getElementById("settings-feedback");
+  feedback.classList.remove("hidden");
+
+  setTimeout(() => {
+    feedback.classList.add("hidden");
+    closeSettings();
+  }, 1200);
+}
