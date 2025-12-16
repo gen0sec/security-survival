@@ -3114,6 +3114,16 @@ function restoreConnections(savedConnections, internetConnections) {
 
 // AUTH FUNCTIONALITY
 
+document.addEventListener("DOMContentLoaded", () => {
+  if (!window.supabaseEnabled) {
+    document.querySelectorAll(".supabase-only").forEach((btn) => {
+      btn.disabled = true;
+      btn.classList.add("opacity-50", "cursor-not-allowed");
+      btn.title = "Online features disabled";
+    });
+  }
+});
+
 async function registerUser(email, password) {
   try {
     const { data, error } = await window.supabase.auth.signUp({
@@ -3282,6 +3292,8 @@ async function searchLeaderboard(email) {
 
 async function saveUserScore() {
   try {
+    if (!window.supabaseEnabled) return;
+
     const {
       data: { user },
     } = await window.supabase.auth.getUser();
