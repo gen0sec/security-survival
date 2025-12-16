@@ -10,7 +10,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.80.1/dist/phaser.min.js"></script>
-    <link rel="stylesheet" href="style.css" />
     <script type="module">
       import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -20,11 +19,12 @@
 
       window.supabase = createClient(supabaseUrl, supabaseAnonKey);
     </script>
+    <link rel="stylesheet" href="style.css" />
   </head>
 
   <body>
     <!-- UI Overlay: Top Bar -->
-    <div class="absolute top-0 left-0 w-full h-full pointer-events-none">
+    <div class="absolute top-0 left-0 w-full h-full pointer-events-none z-20">
       <!-- Stats Panel (Top Left) -->
       <div
         id="statsPanel"
