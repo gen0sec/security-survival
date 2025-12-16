@@ -231,6 +231,12 @@ const CONFIG = {
       duration: 12,
       maliciousPercent: 0.5,
       warningTime: 3,
+      indicator: {
+        enabled: true,
+        html: `<div class="bg-red-900/80 border-2 border-red-500 rounded-lg px-4 py-2 animate-pulse">
+            <span class="text-red-400 font-bold">DDoS ATTACK ACTIVE</span>
+        </div>`,
+      },
     },
 
     // Service degradation - services lose health over time

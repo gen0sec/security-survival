@@ -160,16 +160,19 @@ function startMaliciousSpike() {
     };
 
     // Visual indicator
-    const indicator = document.createElement("div");
-    indicator.id = "malicious-spike-indicator";
-    indicator.className =
-        "fixed top-4 left-1/2 transform -translate-x-1/2 z-40 pointer-events-none";
-    indicator.innerHTML = `
-        <div class="bg-red-900/80 border-2 border-red-500 rounded-lg px-4 py-2 animate-pulse">
-            <span class="text-red-400 font-bold">🔥 DDoS ATTACK ACTIVE 🔥</span>
-        </div>
-    `;
-    document.body.appendChild(indicator);
+    const indicatorCfg = CONFIG.survival.maliciousSpike.indicator;
+    if (indicatorCfg?.enabled) {
+        const indicator = document.createElement("div");
+        indicator.id = "malicious-spike-indicator";
+        indicator.className =
+            "fixed top-4 left-1/2 transform -translate-x-1/2 z-40 pointer-events-none";
+        indicator.innerHTML =
+            indicatorCfg.html ||
+            `<div class="bg-red-900/80 border-2 border-red-500 rounded-lg px-4 py-2 animate-pulse">
+                <span class="text-red-400 font-bold">DDoS ATTACK ACTIVE</span>
+            </div>`;
+        document.body.appendChild(indicator);
+    }
 
     // Update mix display
     const maliciousEl = document.getElementById("mix-malicious");
