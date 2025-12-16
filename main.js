@@ -1,10 +1,10 @@
 class GameScene extends Phaser.Scene {
-    create() {
-        initThreeWorld();
-        initInputHandlers();
+  create() {
+    initThreeWorld();
+    initInputHandlers();
 
-        // Keep Phaser's canvas from intercepting input meant for Three.js/DOM
-        const canvas = this.game.canvas;
+    // Keep Phaser's canvas from intercepting input meant for Three.js/DOM
+    const canvas = this.game.canvas;
         if (canvas) {
             canvas.style.position = "absolute";
             canvas.style.top = "0";

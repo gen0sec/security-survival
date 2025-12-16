@@ -160,16 +160,19 @@ function startMaliciousSpike() {
     };
 
     // Visual indicator
-    const indicator = document.createElement("div");
-    indicator.id = "malicious-spike-indicator";
-    indicator.className =
-        "fixed top-4 left-1/2 transform -translate-x-1/2 z-40 pointer-events-none";
-    indicator.innerHTML = `
-        <div class="bg-red-900/80 border-2 border-red-500 rounded-lg px-4 py-2 animate-pulse">
-            <span class="text-red-400 font-bold">🔥 DDoS ATTACK ACTIVE 🔥</span>
-        </div>
-    `;
-    document.body.appendChild(indicator);
+    const indicatorCfg = CONFIG.survival.maliciousSpike.indicator;
+    if (indicatorCfg?.enabled) {
+        const indicator = document.createElement("div");
+        indicator.id = "malicious-spike-indicator";
+        indicator.className =
+            "fixed top-4 left-1/2 transform -translate-x-1/2 z-40 pointer-events-none";
+        indicator.innerHTML =
+            indicatorCfg.html ||
+            `<div class="bg-red-900/80 border-2 border-red-500 rounded-lg px-4 py-2 animate-pulse">
+                <span class="text-red-400 font-bold">DDoS ATTACK ACTIVE</span>
+            </div>`;
+        document.body.appendChild(indicator);
+    }
 
     // Update mix display
     const maliciousEl = document.getElementById("mix-malicious");
@@ -662,48 +665,29 @@ function updateFinancesDisplay() {
 
     // Expense categories - services with costs
     const serviceTypes = [
-        {
-            key: "waf",
-            label: "WAF",
-            color: "text-red-400",
-            cost: CONFIG.services.waf.cost,
-        },
-        {
-            key: "alb",
-            label: "ALB",
-            color: "text-blue-400",
-            cost: CONFIG.services.alb.cost,
-        },
+        { key: "waf", color: "text-red-400", cost: CONFIG.services.waf.cost },
+        { key: "alb", color: "text-blue-400", cost: CONFIG.services.alb.cost },
         {
             key: "compute",
-            label: "Compute",
             color: "text-green-400",
             cost: CONFIG.services.compute.cost,
         },
         {
             key: "db",
-            label: "Database",
             color: "text-yellow-400",
             cost: CONFIG.services.db.cost,
         },
         {
             key: "s3",
-            label: "S3",
             color: "text-purple-400",
             cost: CONFIG.services.s3.cost,
         },
         {
             key: "cache",
-            label: "Cache",
             color: "text-orange-400",
             cost: CONFIG.services.cache.cost,
         },
-        {
-            key: "sqs",
-            label: "SQS",
-            color: "text-cyan-400",
-            cost: CONFIG.services.sqs.cost,
-        },
+        { key: "sqs", color: "text-cyan-400", cost: CONFIG.services.sqs.cost },
     ];
 
     const repairPercent = CONFIG.survival.degradation?.repairCostPercent || 0.15;
@@ -719,10 +703,11 @@ function updateFinancesDisplay() {
             const value = f.expenses.byService[t.key] || 0;
             const count = f.expenses.countByService[t.key] || 0;
             const repairCost = Math.ceil(t.cost * repairPercent);
+            const label = CONFIG.services[t.key]?.name || t.key.toUpperCase();
             if (value > 0 || count > 0) {
                 hasServiceExpenses = true;
                 expenseHtml += `<div class="grid grid-cols-5 gap-1"><span class="${t.color
-                    }">${t.label
+                    }">${label
                     }</span><span class="text-center text-gray-500">${count}</span><span class="text-center text-gray-400">$${t.cost
                     }</span><span class="text-center text-yellow-400">$${repairCost}</span><span class="text-right text-gray-300">$${Math.floor(
                         value
@@ -976,16 +961,32 @@ function initInputHandlers() {
             (i.type === "service" || i.type === "internet")
         ) {
             if (STATE.selectedNodeId) {
-                createConnection(STATE.selectedNodeId, i.id);
-                STATE.selectedNodeId = null;
+                if (STATE.selectedNodeId === i.id) {
+                    // Clicking the same node again cancels the pending link
+                    STATE.selectedNodeId = null;
+                    container.style.cursor = "default";
+                } else {
+                    createConnection(STATE.selectedNodeId, i.id);
+                    STATE.selectedNodeId = null;
+                }
             } else {
                 STATE.selectedNodeId = i.id;
                 new Audio("assets/sounds/click-5.mp3").play();
             }
         } else if (
-            ["waf", "alb", "lambda", "db", "s3", "sqs", "cache"].includes(
-                STATE.activeTool
-            )
+            [
+                "waf",
+                "alb",
+                "lambda",
+                "db",
+                "s3",
+                "sqs",
+                "cache",
+                "edge",
+                "content",
+                "intel",
+                "siem",
+            ].includes(STATE.activeTool)
         ) {
             // Handle upgrades for compute, db, and cache
             if (
@@ -1013,6 +1014,10 @@ function initInputHandlers() {
                     s3: "s3",
                     sqs: "sqs",
                     cache: "cache",
+                    edge: "edge",
+                    content: "content",
+                    intel: "intel",
+                    siem: "siem",
                 };
                 createService(typeMap[STATE.activeTool], snapToGrid(i.pos));
             }
@@ -1287,18 +1292,6 @@ function initInputHandlers() {
             isPanning = false;
             container.style.cursor = "default";
             return;
-        }
-
-        if (STATE.activeTool === "connect") {
-            // Allow selecting same node to deselect
-            const hit = getIntersect(e.clientX, e.clientY);
-            if (hit.type === "service" || hit.type === "internet") {
-                if (STATE.selectedNodeId === hit.id) {
-                    STATE.selectedNodeId = null;
-                    container.style.cursor = "default";
-                    return;
-                }
-            }
         }
     });
 }
@@ -1910,21 +1903,25 @@ function createConnection(fromId, toId) {
     const t1 = from.type,
         t2 = to.type;
 
-    if (t1 === "internet" && (t2 === "waf" || t2 === "alb")) valid = true;
+    if (t1 === "internet" && (t2 === "waf" || t2 === "alb" || t2 === "edge"))
+        valid = true;
+    else if (t1 === "edge" && (t2 === "alb" || t2 === "waf")) valid = true;
     else if (t1 === "waf" && t2 === "alb") valid = true;
     else if (t1 === "waf" && t2 === "sqs") valid = true;
     else if (t1 === "sqs" && t2 === "alb") valid = true;
     else if (t1 === "alb" && t2 === "sqs") valid = true;
+    else if (t1 === "alb" && (t2 === "compute" || t2 === "waf" || t2 === "content" || t2 === "intel"))
+        valid = true;
     else if (t1 === "sqs" && t2 === "compute") valid = true;
-    else if (t1 === "alb" && t2 === "compute") valid = true;
     else if (t1 === "compute" && t2 === "cache") valid = true;
+    else if (t1 === "compute" && t2 === "siem") valid = true;
     else if (t1 === "cache" && (t2 === "db" || t2 === "s3")) valid = true;
     else if (t1 === "compute" && (t2 === "db" || t2 === "s3")) valid = true;
 
     if (!valid) {
         new Audio("assets/sounds/click-9.mp3").play();
         console.error(
-            "Invalid connection topology: WAF/ALB from Internet -> WAF -> ALB -> Compute -> (RDS/S3)"
+            "Invalid connection topology: Internet -> Firewall -> Load Balancer -> Compute -> (DB/S3)"
         );
         return;
     }
@@ -2120,336 +2117,6 @@ const minZoom = 0.5;
 const maxZoom = 3.0;
 const zoomSpeed = 0.001;
 
-if (!inputInitialized && container) {
-container.addEventListener("wheel", (e) => {
-    e.preventDefault();
-
-    // Zoom logic
-    const zoomDelta = e.deltaY * -zoomSpeed;
-    const newZoom = Math.max(minZoom, Math.min(maxZoom, currentZoom + zoomDelta));
-
-    if (newZoom !== currentZoom) {
-        currentZoom = newZoom;
-
-        // For OrthographicCamera, zoom is applied via dividing the frustum or using the zoom property
-        // Three.js OrthographicCamera has a .zoom property
-        camera.zoom = currentZoom;
-        camera.updateProjectionMatrix();
-    }
-}, { passive: false });
-
-// Keyboard navigation
-window.addEventListener("keydown", (e) => {
-    keysPressed[e.key] = true;
-});
-
-window.addEventListener("keyup", (e) => {
-    keysPressed[e.key] = false;
-});
-
-container.addEventListener("contextmenu", (e) => e.preventDefault());
-
-container.addEventListener("mousedown", (e) => {
-    if (!STATE.isRunning) return;
-
-    if (e.button === 2 || e.button === 1) {
-        isPanning = true;
-        lastMouseX = e.clientX;
-        lastMouseY = e.clientY;
-        container.style.cursor = "grabbing";
-        e.preventDefault();
-        return;
-    }
-
-    const i = getIntersect(e.clientX, e.clientY);
-    if (STATE.activeTool === "select") {
-        const i = getIntersect(e.clientX, e.clientY);
-        if (i.type === "service") {
-            const svc = STATE.services.find((s) => s.id === i.id);
-            // Check if service needs repair (double-click logic could be added)
-            if (svc && svc.health < 80 && CONFIG.survival.degradation?.enabled) {
-                // Repair on click when damaged
-                if (svc.repair()) {
-                    addInterventionWarning(
-                        `🔧 ${svc.type.toUpperCase()} repaired!`,
-                        "info",
-                        2000
-                    );
-                    return;
-                }
-            }
-            draggedNode = svc;
-        } else if (i.type === "internet") {
-            draggedNode = STATE.internetNode;
-        }
-        if (draggedNode) {
-            isDraggingNode = true;
-            const hit = getIntersect(e.clientX, e.clientY);
-            if (hit.pos) {
-                dragOffset.copy(draggedNode.position).sub(hit.pos);
-            }
-            container.style.cursor = "grabbing";
-            e.preventDefault();
-            return;
-        }
-    } else if (STATE.activeTool === "delete" && i.type === "service")
-        deleteObject(i.id);
-    else if (STATE.activeTool === "unlink") {
-        const conn = getConnectionAtPoint(e.clientX, e.clientY);
-        if (conn) {
-            deleteConnection(conn.from, conn.to);
-        } else {
-            new Audio("assets/sounds/click-9.mp3").play();
-        }
-    } else if (
-        STATE.activeTool === "connect" &&
-        (i.type === "service" || i.type === "internet")
-    ) {
-        if (STATE.selectedNodeId) {
-            createConnection(STATE.selectedNodeId, i.id);
-            STATE.selectedNodeId = null;
-        } else {
-            STATE.selectedNodeId = i.id;
-            new Audio("assets/sounds/click-5.mp3").play();
-        }
-    } else if (
-        ["waf", "alb", "lambda", "db", "s3", "sqs", "cache"].includes(
-            STATE.activeTool
-        )
-    ) {
-        // Handle upgrades for compute, db, and cache
-        if (
-            (STATE.activeTool === "lambda" && i.type === "service") ||
-            (STATE.activeTool === "db" && i.type === "service") ||
-            (STATE.activeTool === "cache" && i.type === "service")
-        ) {
-            const svc = STATE.services.find((s) => s.id === i.id);
-            if (
-                svc &&
-                ((STATE.activeTool === "lambda" && svc.type === "compute") ||
-                    (STATE.activeTool === "db" && svc.type === "db") ||
-                    (STATE.activeTool === "cache" && svc.type === "cache"))
-            ) {
-                svc.upgrade();
-                return;
-            }
-        }
-        if (i.type === "ground") {
-            const typeMap = {
-                waf: "waf",
-                alb: "alb",
-                lambda: "compute",
-                db: "db",
-                s3: "s3",
-                sqs: "sqs",
-                cache: "cache",
-            };
-            createService(typeMap[STATE.activeTool], snapToGrid(i.pos));
-        }
-    }
-});
-
-container.addEventListener("mousemove", (e) => {
-    if (isDraggingNode && draggedNode) {
-        const hit = getIntersect(e.clientX, e.clientY);
-        if (hit.pos) {
-            const newPos = hit.pos.clone().add(dragOffset);
-            newPos.y = 0;
-
-            draggedNode.position.copy(newPos);
-
-            if (draggedNode.mesh) {
-                draggedNode.mesh.position.x = newPos.x;
-                draggedNode.mesh.position.z = newPos.z;
-            } else {
-                STATE.internetNode.mesh.position.x = newPos.x;
-                STATE.internetNode.mesh.position.z = newPos.z;
-                STATE.internetNode.ring.position.x = newPos.x;
-                STATE.internetNode.ring.position.z = newPos.z;
-            }
-
-            updateConnectionsForNode(draggedNode.id);
-
-            container.style.cursor = "grabbing";
-        }
-        return;
-    }
-    if (isPanning) {
-        const dx = e.clientX - lastMouseX;
-        const dy = e.clientY - lastMouseY;
-
-        const panX =
-            ((-dx * (camera.right - camera.left)) / window.innerWidth) * panSpeed;
-        const panY =
-            ((dy * (camera.top - camera.bottom)) / window.innerHeight) * panSpeed;
-
-        if (isIsometric) {
-            camera.position.x += panX;
-            camera.position.z += panY;
-            cameraTarget.x += panX;
-            cameraTarget.z += panY;
-            camera.lookAt(cameraTarget);
-        } else {
-            camera.position.x += panX;
-            camera.position.z += panY;
-            camera.lookAt(camera.position.x, 0, camera.position.z);
-        }
-        camera.updateProjectionMatrix();
-        lastMouseX = e.clientX;
-        lastMouseY = e.clientY;
-        document.getElementById("tooltip").style.display = "none";
-        return;
-    }
-
-    const i = getIntersect(e.clientX, e.clientY);
-    const t = document.getElementById("tooltip");
-    let cursor = "default";
-
-    // Reset all connection colors first
-    STATE.connections.forEach((c) => {
-        if (c.mesh && c.mesh.material) {
-            c.mesh.material.color.setHex(CONFIG.colors.line);
-        }
-    });
-
-    // Handle unlink tool hover
-    if (STATE.activeTool === "unlink") {
-        const conn = getConnectionAtPoint(e.clientX, e.clientY);
-        if (conn) {
-            cursor = "pointer";
-            // Highlight the connection in red
-            if (conn.mesh && conn.mesh.material) {
-                conn.mesh.material.color.setHex(0xff4444);
-            }
-
-            // Get source and target names for tooltip
-            const from =
-                conn.from === "internet"
-                    ? STATE.internetNode
-                    : STATE.services.find((s) => s.id === conn.from);
-            const to =
-                conn.to === "internet"
-                    ? STATE.internetNode
-                    : STATE.services.find((s) => s.id === conn.to);
-            const fromName =
-                conn.from === "internet" ? "Internet" : from?.config?.name || "Unknown";
-            const toName =
-                conn.to === "internet" ? "Internet" : to?.config?.name || "Unknown";
-
-            showTooltip(
-                e.clientX + 15,
-                e.clientY + 15,
-                `<strong class="text-orange-400">Remove Link</strong><br>
-                <span class="text-gray-300">${fromName}</span> → <span class="text-gray-300">${toName}</span><br>
-                <span class="text-red-400 text-xs">Click to remove</span>`
-            );
-        } else {
-            t.style.display = "none";
-        }
-        container.style.cursor = cursor;
-        return;
-    }
-
-    if (i.type === "service") {
-        const s = STATE.services.find((s) => s.id === i.id);
-        if (s) {
-            const load = s.processing.length / s.config.capacity;
-            let loadColor =
-                load > 0.8
-                    ? "text-red-400"
-                    : load > 0.4
-                        ? "text-yellow-400"
-                        : "text-green-400";
-
-            // Base tooltip content with static info
-            let content = `<strong class="text-blue-300">${s.config.name}</strong>`;
-            if (s.tier)
-                content += ` <span class="text-xs text-yellow-400">T${s.tier}</span>`;
-
-            // Show health percentage
-            const healthColor =
-                s.health < 40
-                    ? "text-red-400"
-                    : s.health < 70
-                        ? "text-yellow-400"
-                        : "text-green-400";
-            content += ` <span class="${healthColor}">${Math.round(
-                s.health
-            )}%</span>`;
-
-            // Add static description and upkeep if available
-            if (s.config.tooltip) {
-                content += `<br><span class="text-xs text-gray-400">${s.config.tooltip.desc}</span>`;
-                content += `<br><span class="text-xs text-gray-500">Upkeep: <span class="text-gray-300">${s.config.tooltip.upkeep}</span></span>`;
-            }
-
-            content += `<div class="mt-1 border-t border-gray-700 pt-1">`;
-
-            // Service-specific dynamic stats
-            if (s.type === "cache") {
-                const hitRate = Math.round((s.config.cacheHitRate || 0.35) * 100);
-                content += `Queue: <span class="${loadColor}">${s.queue.length}</span><br>
-                Load: <span class="${loadColor}">${s.processing.length}/${s.config.capacity}</span><br>
-                Hit Rate: <span class="text-green-400">${hitRate}%</span>`;
-            } else if (s.type === "sqs") {
-                const maxQ = s.config.maxQueueSize || 200;
-                const fillPercent = Math.round((s.queue.length / maxQ) * 100);
-                const status =
-                    fillPercent > 80 ? "Critical" : fillPercent > 50 ? "Busy" : "Healthy";
-                const statusColor =
-                    fillPercent > 80
-                        ? "text-red-400"
-                        : fillPercent > 50
-                            ? "text-yellow-400"
-                            : "text-green-400";
-                content += `Buffered: <span class="${loadColor}">${s.queue.length}/${maxQ}</span><br>
-                Processing: ${s.processing.length}/${s.config.capacity}<br>
-                Status: <span class="${statusColor}">${status}</span>`;
-            } else {
-                content += `Queue: <span class="${loadColor}">${s.queue.length}</span><br>
-                Load: <span class="${loadColor}">${s.processing.length}/${s.config.capacity}</span>`;
-            }
-            content += `</div>`;
-
-            // Show upgrade option for upgradeable services
-            if (
-                (STATE.activeTool === "lambda" && s.type === "compute") ||
-                (STATE.activeTool === "db" && s.type === "db") ||
-                (STATE.activeTool === "cache" && s.type === "cache")
-            ) {
-                const tiers = CONFIG.services[s.type].tiers;
-                if (s.tier < tiers.length) {
-                    cursor = "pointer";
-                    const nextCost = tiers[s.tier].cost;
-                    content += `<div class="mt-1 pt-1 border-t border-gray-700"><span class="text-green-300 text-xs font-bold">Upgrade: $${nextCost}</span></div>`;
-                    if (s.mesh.material.emissive)
-                        s.mesh.material.emissive.setHex(0x333333);
-                } else {
-                    content += `<div class="mt-1 pt-1 border-t border-gray-700"><span class="text-gray-500 text-xs">Max Tier</span></div>`;
-                }
-            }
-
-            showTooltip(e.clientX + 15, e.clientY + 15, content);
-
-            // Reset previous highlights
-            STATE.services.forEach((svc) => {
-                if (svc !== s && svc.mesh.material.emissive)
-                    svc.mesh.material.emissive.setHex(0x000000);
-            });
-        }
-    } else {
-        t.style.display = "none";
-        // Reset highlights when not hovering service
-        STATE.services.forEach((svc) => {
-            if (svc.mesh.material.emissive)
-                svc.mesh.material.emissive.setHex(0x000000);
-        });
-    }
-
-    container.style.cursor = cursor;
-});
-}
-
 // Helper function for showing tooltips
 function showTooltip(x, y, html) {
     const t = document.getElementById("tooltip");
@@ -2461,7 +2128,7 @@ function showTooltip(x, y, html) {
 
 // Setup UI tooltips
 function setupUITooltips() {
-    const tools = ["waf", "sqs", "alb", "lambda", "db", "cache", "s3"];
+    const tools = ["edge", "waf", "alb", "content", "intel", "sqs", "lambda", "db", "cache", "s3", "siem"];
     tools.forEach((toolId) => {
         const btn = document.getElementById(`tool-${toolId}`);
         if (!btn) return;
@@ -2903,8 +2570,8 @@ function analyzeFailure() {
 
         if (maliciousFailures > totalFailures * 0.3) {
             result.description = `Too many malicious requests got through (${maliciousFailures} attacks passed). Each unblocked attack costs -5 reputation.`;
-            result.tips.push("Add a WAF (Firewall) as your first line of defense");
-            result.tips.push("Multiple WAFs can handle traffic spikes better");
+            result.tips.push("Add a Firewall as your first line of defense");
+            result.tips.push("Multiple Firewalls can handle traffic spikes better");
         } else {
             const worstFailure = Object.entries(STATE.failures)
                 .filter(([k]) => k !== "MALICIOUS")
@@ -2955,12 +2622,12 @@ function analyzeFailure() {
 
         result.tips.push("Focus on processing more requests to increase income");
         result.tips.push("Use Cache to speed up request processing");
-        result.tips.push("Cheaper services (WAF, S3) have lower upkeep");
+        result.tips.push("Cheaper services (Firewall, S3) have lower upkeep");
     }
 
     // Add general tips based on game state
     if (STATE.services.length < 3) {
-        result.tips.push("Build a complete pipeline: WAF → ALB → Compute → DB/S3");
+        result.tips.push("Build a complete pipeline: Firewall → Load Balancer → Compute → DB/S3");
     }
 
     if (!STATE.services.some((s) => s.type === "cache")) {
