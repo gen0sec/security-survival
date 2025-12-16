@@ -788,79 +788,104 @@ function updateFinancesDisplay() {
 const ORTHO_SIZE = 50;
 let container = null;
 let scene = null;
+let camera = null;
+let cameraTarget = null;
 let renderer = null;
+let isIsometric = true;
 let serviceGroup = null;
 let connectionGroup = null;
 let requestGroup = null;
+let gridHelper = null;
+let internetMesh = null;
+let internetRing = null;
 let ambientLight = null;
 let dirLight = null;
 let isDraggingNode = false;
 let draggedNode = null;
 let dragOffset = new THREE.Vector3();
 
-const aspect = window.innerWidth / window.innerHeight;
-const d = 50;
-const camera = new THREE.OrthographicCamera(
-  -d * aspect,
-  d * aspect,
-  d,
-  -d,
-  1,
-  1000,
-);
-const cameraTarget = new THREE.Vector3(0, 0, 0);
-let isIsometric = true;
-resetCamera();
+function initThreeWorld() {
+  if (scene) return;
 
-container = document.getElementById("canvas-container");
+  container = document.getElementById("canvas-container");
+  const aspect = window.innerWidth / window.innerHeight;
 
-scene = new THREE.Scene();
-scene.background = new THREE.Color(CONFIG.colors.bg);
-scene.fog = new THREE.FogExp2(CONFIG.colors.bg, 0.008);
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(CONFIG.colors.bg);
+  scene.fog = new THREE.FogExp2(CONFIG.colors.bg, 0.008);
 
-const gridHelper = new THREE.GridHelper(
-  CONFIG.gridSize * CONFIG.tileSize,
-  CONFIG.gridSize,
-  CONFIG.colors.grid,
-  CONFIG.colors.grid,
-);
-scene.add(gridHelper);
+  camera = new THREE.OrthographicCamera(
+    -ORTHO_SIZE * aspect,
+    ORTHO_SIZE * aspect,
+    ORTHO_SIZE,
+    -ORTHO_SIZE,
+    1,
+    1000,
+  );
+  cameraTarget = new THREE.Vector3(0, 0, 0);
+  isIsometric = true;
+  resetCamera();
 
-renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.shadowMap.enabled = true;
-container.appendChild(renderer.domElement);
+  renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.shadowMap.enabled = true;
+  container.appendChild(renderer.domElement);
 
-const internetGeo = new THREE.BoxGeometry(6, 1, 10);
-const internetMat = new THREE.MeshStandardMaterial({
-  color: 0x111111,
-  emissive: 0x00ffff,
-  emissiveIntensity: 0.7,
-  roughness: 0.2,
-});
-const internetMesh = new THREE.Mesh(internetGeo, internetMat);
-internetMesh.position.copy(STATE.internetNode.position);
-internetMesh.castShadow = true;
-internetMesh.receiveShadow = true;
-scene.add(internetMesh);
-STATE.internetNode.mesh = internetMesh;
+  ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+  scene.add(ambientLight);
+  dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  dirLight.position.set(20, 50, 20);
+  dirLight.castShadow = true;
+  dirLight.shadow.mapSize.width = 2048;
+  dirLight.shadow.mapSize.height = 2048;
+  scene.add(dirLight);
 
-const intRingGeo = new THREE.RingGeometry(7, 7.2, 32);
-const intRingMat = new THREE.MeshStandardMaterial({
-  color: 0x00ffff,
-  transparent: true,
-  opacity: 0.2,
-  side: THREE.DoubleSide,
-});
-const internetRing = new THREE.Mesh(intRingGeo, intRingMat);
-internetRing.rotation.x = -Math.PI / 2;
-internetRing.position.set(
-  internetMesh.position.x,
-  -internetMesh.position.y + 0.1,
-  internetMesh.position.z,
-);
-scene.add(internetRing);
-STATE.internetNode.ring = internetRing;
+  gridHelper = new THREE.GridHelper(
+    CONFIG.gridSize * CONFIG.tileSize,
+    CONFIG.gridSize,
+    CONFIG.colors.grid,
+    CONFIG.colors.grid,
+  );
+  scene.add(gridHelper);
+
+  serviceGroup = new THREE.Group();
+  connectionGroup = new THREE.Group();
+  requestGroup = new THREE.Group();
+  scene.add(serviceGroup);
+  scene.add(connectionGroup);
+  scene.add(requestGroup);
+
+  const internetGeo = new THREE.BoxGeometry(6, 1, 10);
+  const internetMat = new THREE.MeshStandardMaterial({
+    color: 0x111111,
+    emissive: 0x00ffff,
+    emissiveIntensity: 0.7,
+    roughness: 0.2,
+  });
+  internetMesh = new THREE.Mesh(internetGeo, internetMat);
+  internetMesh.position.copy(STATE.internetNode.position);
+  internetMesh.castShadow = true;
+  internetMesh.receiveShadow = true;
+  scene.add(internetMesh);
+  STATE.internetNode.mesh = internetMesh;
+
+  const intRingGeo = new THREE.RingGeometry(7, 7.2, 32);
+  const intRingMat = new THREE.MeshStandardMaterial({
+    color: 0x00ffff,
+    transparent: true,
+    opacity: 0.2,
+    side: THREE.DoubleSide,
+  });
+  internetRing = new THREE.Mesh(intRingGeo, intRingMat);
+  internetRing.rotation.x = -Math.PI / 2;
+  internetRing.position.set(
+    internetMesh.position.x,
+    -internetMesh.position.y + 0.1,
+    internetMesh.position.z,
+  );
+  scene.add(internetRing);
+  STATE.internetNode.ring = internetRing;
+}
 
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
@@ -1499,11 +1524,6 @@ function resetGame(mode = "survival") {
     if (sandboxPanel) sandboxPanel.classList.add("hidden");
     if (objectivesPanel) objectivesPanel.classList.remove("hidden");
   }
-
-  // Ensure loop is running
-  if (!STATE.animationId) {
-    animate(performance.now());
-  }
 }
 
 function restartGame() {
@@ -2121,340 +2141,348 @@ const minZoom = 0.5;
 const maxZoom = 3.0;
 const zoomSpeed = 0.001;
 
-container.addEventListener(
-  "wheel",
-  (e) => {
-    e.preventDefault();
+if (!inputInitialized && container) {
+  container.addEventListener(
+    "wheel",
+    (e) => {
+      e.preventDefault();
 
-    // Zoom logic
-    const zoomDelta = e.deltaY * -zoomSpeed;
-    const newZoom = Math.max(
-      minZoom,
-      Math.min(maxZoom, currentZoom + zoomDelta),
-    );
+      // Zoom logic
+      const zoomDelta = e.deltaY * -zoomSpeed;
+      const newZoom = Math.max(
+        minZoom,
+        Math.min(maxZoom, currentZoom + zoomDelta),
+      );
 
-    if (newZoom !== currentZoom) {
-      currentZoom = newZoom;
+      if (newZoom !== currentZoom) {
+        currentZoom = newZoom;
 
-      // For OrthographicCamera, zoom is applied via dividing the frustum or using the zoom property
-      // Three.js OrthographicCamera has a .zoom property
-      camera.zoom = currentZoom;
-      camera.updateProjectionMatrix();
-    }
-  },
-  { passive: false },
-);
-
-// Keyboard navigation
-window.addEventListener("keydown", (e) => {
-  keysPressed[e.key] = true;
-});
-
-window.addEventListener("keyup", (e) => {
-  keysPressed[e.key] = false;
-});
-
-container.addEventListener("contextmenu", (e) => e.preventDefault());
-
-container.addEventListener("mousedown", (e) => {
-  if (!STATE.isRunning) return;
-
-  if (e.button === 2 || e.button === 1) {
-    isPanning = true;
-    lastMouseX = e.clientX;
-    lastMouseY = e.clientY;
-    container.style.cursor = "grabbing";
-    e.preventDefault();
-    return;
-  }
-
-  const i = getIntersect(e.clientX, e.clientY);
-  if (STATE.activeTool === "select") {
-    const i = getIntersect(e.clientX, e.clientY);
-    if (i.type === "service") {
-      const svc = STATE.services.find((s) => s.id === i.id);
-      // Check if service needs repair (double-click logic could be added)
-      if (svc && svc.health < 80 && CONFIG.survival.degradation?.enabled) {
-        // Repair on click when damaged
-        if (svc.repair()) {
-          addInterventionWarning(
-            `🔧 ${svc.type.toUpperCase()} repaired!`,
-            "info",
-            2000,
-          );
-          return;
-        }
+        // For OrthographicCamera, zoom is applied via dividing the frustum or using the zoom property
+        // Three.js OrthographicCamera has a .zoom property
+        camera.zoom = currentZoom;
+        camera.updateProjectionMatrix();
       }
-      draggedNode = svc;
-    } else if (i.type === "internet") {
-      draggedNode = STATE.internetNode;
-    }
-    if (draggedNode) {
-      isDraggingNode = true;
-      const hit = getIntersect(e.clientX, e.clientY);
-      if (hit.pos) {
-        dragOffset.copy(draggedNode.position).sub(hit.pos);
-      }
+    },
+    { passive: false },
+  );
+
+  // Keyboard navigation
+  window.addEventListener("keydown", (e) => {
+    keysPressed[e.key] = true;
+  });
+
+  window.addEventListener("keyup", (e) => {
+    keysPressed[e.key] = false;
+  });
+
+  container.addEventListener("contextmenu", (e) => e.preventDefault());
+
+  container.addEventListener("mousedown", (e) => {
+    if (!STATE.isRunning) return;
+
+    if (e.button === 2 || e.button === 1) {
+      isPanning = true;
+      lastMouseX = e.clientX;
+      lastMouseY = e.clientY;
       container.style.cursor = "grabbing";
       e.preventDefault();
       return;
     }
-  } else if (STATE.activeTool === "delete" && i.type === "service")
-    deleteObject(i.id);
-  else if (STATE.activeTool === "unlink") {
-    const conn = getConnectionAtPoint(e.clientX, e.clientY);
-    if (conn) {
-      deleteConnection(conn.from, conn.to);
-    } else {
-      new Audio("assets/sounds/click-9.mp3").play();
-    }
-  } else if (
-    STATE.activeTool === "connect" &&
-    (i.type === "service" || i.type === "internet")
-  ) {
-    if (STATE.selectedNodeId) {
-      createConnection(STATE.selectedNodeId, i.id);
-      STATE.selectedNodeId = null;
-    } else {
-      STATE.selectedNodeId = i.id;
-      new Audio("assets/sounds/click-5.mp3").play();
-    }
-  } else if (
-    ["waf", "alb", "lambda", "db", "s3", "sqs", "cache"].includes(
-      STATE.activeTool,
-    )
-  ) {
-    // Handle upgrades for compute, db, and cache
-    if (
-      (STATE.activeTool === "lambda" && i.type === "service") ||
-      (STATE.activeTool === "db" && i.type === "service") ||
-      (STATE.activeTool === "cache" && i.type === "service")
-    ) {
-      const svc = STATE.services.find((s) => s.id === i.id);
-      if (
-        svc &&
-        ((STATE.activeTool === "lambda" && svc.type === "compute") ||
-          (STATE.activeTool === "db" && svc.type === "db") ||
-          (STATE.activeTool === "cache" && svc.type === "cache"))
-      ) {
-        svc.upgrade();
+
+    const i = getIntersect(e.clientX, e.clientY);
+    if (STATE.activeTool === "select") {
+      const i = getIntersect(e.clientX, e.clientY);
+      if (i.type === "service") {
+        const svc = STATE.services.find((s) => s.id === i.id);
+        // Check if service needs repair (double-click logic could be added)
+        if (svc && svc.health < 80 && CONFIG.survival.degradation?.enabled) {
+          // Repair on click when damaged
+          if (svc.repair()) {
+            addInterventionWarning(
+              `🔧 ${svc.type.toUpperCase()} repaired!`,
+              "info",
+              2000,
+            );
+            return;
+          }
+        }
+        draggedNode = svc;
+      } else if (i.type === "internet") {
+        draggedNode = STATE.internetNode;
+      }
+      if (draggedNode) {
+        isDraggingNode = true;
+        const hit = getIntersect(e.clientX, e.clientY);
+        if (hit.pos) {
+          dragOffset.copy(draggedNode.position).sub(hit.pos);
+        }
+        container.style.cursor = "grabbing";
+        e.preventDefault();
         return;
       }
-    }
-    if (i.type === "ground") {
-      const typeMap = {
-        waf: "waf",
-        alb: "alb",
-        lambda: "compute",
-        db: "db",
-        s3: "s3",
-        sqs: "sqs",
-        cache: "cache",
-      };
-      createService(typeMap[STATE.activeTool], snapToGrid(i.pos));
-    }
-  }
-});
-
-container.addEventListener("mousemove", (e) => {
-  if (isDraggingNode && draggedNode) {
-    const hit = getIntersect(e.clientX, e.clientY);
-    if (hit.pos) {
-      const newPos = hit.pos.clone().add(dragOffset);
-      newPos.y = 0;
-
-      draggedNode.position.copy(newPos);
-
-      if (draggedNode.mesh) {
-        draggedNode.mesh.position.x = newPos.x;
-        draggedNode.mesh.position.z = newPos.z;
+    } else if (STATE.activeTool === "delete" && i.type === "service")
+      deleteObject(i.id);
+    else if (STATE.activeTool === "unlink") {
+      const conn = getConnectionAtPoint(e.clientX, e.clientY);
+      if (conn) {
+        deleteConnection(conn.from, conn.to);
       } else {
-        STATE.internetNode.mesh.position.x = newPos.x;
-        STATE.internetNode.mesh.position.z = newPos.z;
-        STATE.internetNode.ring.position.x = newPos.x;
-        STATE.internetNode.ring.position.z = newPos.z;
+        new Audio("assets/sounds/click-9.mp3").play();
       }
-
-      updateConnectionsForNode(draggedNode.id);
-
-      container.style.cursor = "grabbing";
-    }
-    return;
-  }
-  if (isPanning) {
-    const dx = e.clientX - lastMouseX;
-    const dy = e.clientY - lastMouseY;
-
-    const panX =
-      ((-dx * (camera.right - camera.left)) / window.innerWidth) * panSpeed;
-    const panY =
-      ((dy * (camera.top - camera.bottom)) / window.innerHeight) * panSpeed;
-
-    if (isIsometric) {
-      camera.position.x += panX;
-      camera.position.z += panY;
-      cameraTarget.x += panX;
-      cameraTarget.z += panY;
-      camera.lookAt(cameraTarget);
-    } else {
-      camera.position.x += panX;
-      camera.position.z += panY;
-      camera.lookAt(camera.position.x, 0, camera.position.z);
-    }
-    camera.updateProjectionMatrix();
-    lastMouseX = e.clientX;
-    lastMouseY = e.clientY;
-    document.getElementById("tooltip").style.display = "none";
-    return;
-  }
-
-  const i = getIntersect(e.clientX, e.clientY);
-  const t = document.getElementById("tooltip");
-  let cursor = "default";
-
-  // Reset all connection colors first
-  STATE.connections.forEach((c) => {
-    if (c.mesh && c.mesh.material) {
-      c.mesh.material.color.setHex(CONFIG.colors.line);
+    } else if (
+      STATE.activeTool === "connect" &&
+      (i.type === "service" || i.type === "internet")
+    ) {
+      if (STATE.selectedNodeId) {
+        createConnection(STATE.selectedNodeId, i.id);
+        STATE.selectedNodeId = null;
+      } else {
+        STATE.selectedNodeId = i.id;
+        new Audio("assets/sounds/click-5.mp3").play();
+      }
+    } else if (
+      ["waf", "alb", "lambda", "db", "s3", "sqs", "cache"].includes(
+        STATE.activeTool,
+      )
+    ) {
+      // Handle upgrades for compute, db, and cache
+      if (
+        (STATE.activeTool === "lambda" && i.type === "service") ||
+        (STATE.activeTool === "db" && i.type === "service") ||
+        (STATE.activeTool === "cache" && i.type === "service")
+      ) {
+        const svc = STATE.services.find((s) => s.id === i.id);
+        if (
+          svc &&
+          ((STATE.activeTool === "lambda" && svc.type === "compute") ||
+            (STATE.activeTool === "db" && svc.type === "db") ||
+            (STATE.activeTool === "cache" && svc.type === "cache"))
+        ) {
+          svc.upgrade();
+          return;
+        }
+      }
+      if (i.type === "ground") {
+        const typeMap = {
+          waf: "waf",
+          alb: "alb",
+          lambda: "compute",
+          db: "db",
+          s3: "s3",
+          sqs: "sqs",
+          cache: "cache",
+        };
+        createService(typeMap[STATE.activeTool], snapToGrid(i.pos));
+      }
     }
   });
 
-  // Handle unlink tool hover
-  if (STATE.activeTool === "unlink") {
-    const conn = getConnectionAtPoint(e.clientX, e.clientY);
-    if (conn) {
-      cursor = "pointer";
-      // Highlight the connection in red
-      if (conn.mesh && conn.mesh.material) {
-        conn.mesh.material.color.setHex(0xff4444);
+  container.addEventListener("mousemove", (e) => {
+    if (isDraggingNode && draggedNode) {
+      const hit = getIntersect(e.clientX, e.clientY);
+      if (hit.pos) {
+        const newPos = hit.pos.clone().add(dragOffset);
+        newPos.y = 0;
+
+        draggedNode.position.copy(newPos);
+
+        if (draggedNode.mesh) {
+          draggedNode.mesh.position.x = newPos.x;
+          draggedNode.mesh.position.z = newPos.z;
+        } else {
+          STATE.internetNode.mesh.position.x = newPos.x;
+          STATE.internetNode.mesh.position.z = newPos.z;
+          STATE.internetNode.ring.position.x = newPos.x;
+          STATE.internetNode.ring.position.z = newPos.z;
+        }
+
+        updateConnectionsForNode(draggedNode.id);
+
+        container.style.cursor = "grabbing";
       }
+      return;
+    }
+    if (isPanning) {
+      const dx = e.clientX - lastMouseX;
+      const dy = e.clientY - lastMouseY;
 
-      // Get source and target names for tooltip
-      const from =
-        conn.from === "internet"
-          ? STATE.internetNode
-          : STATE.services.find((s) => s.id === conn.from);
-      const to =
-        conn.to === "internet"
-          ? STATE.internetNode
-          : STATE.services.find((s) => s.id === conn.to);
-      const fromName =
-        conn.from === "internet" ? "Internet" : from?.config?.name || "Unknown";
-      const toName =
-        conn.to === "internet" ? "Internet" : to?.config?.name || "Unknown";
+      const panX =
+        ((-dx * (camera.right - camera.left)) / window.innerWidth) * panSpeed;
+      const panY =
+        ((dy * (camera.top - camera.bottom)) / window.innerHeight) * panSpeed;
 
-      showTooltip(
-        e.clientX + 15,
-        e.clientY + 15,
-        `<strong class="text-orange-400">Remove Link</strong><br>
+      if (isIsometric) {
+        camera.position.x += panX;
+        camera.position.z += panY;
+        cameraTarget.x += panX;
+        cameraTarget.z += panY;
+        camera.lookAt(cameraTarget);
+      } else {
+        camera.position.x += panX;
+        camera.position.z += panY;
+        camera.lookAt(camera.position.x, 0, camera.position.z);
+      }
+      camera.updateProjectionMatrix();
+      lastMouseX = e.clientX;
+      lastMouseY = e.clientY;
+      document.getElementById("tooltip").style.display = "none";
+      return;
+    }
+
+    const i = getIntersect(e.clientX, e.clientY);
+    const t = document.getElementById("tooltip");
+    let cursor = "default";
+
+    // Reset all connection colors first
+    STATE.connections.forEach((c) => {
+      if (c.mesh && c.mesh.material) {
+        c.mesh.material.color.setHex(CONFIG.colors.line);
+      }
+    });
+
+    // Handle unlink tool hover
+    if (STATE.activeTool === "unlink") {
+      const conn = getConnectionAtPoint(e.clientX, e.clientY);
+      if (conn) {
+        cursor = "pointer";
+        // Highlight the connection in red
+        if (conn.mesh && conn.mesh.material) {
+          conn.mesh.material.color.setHex(0xff4444);
+        }
+
+        // Get source and target names for tooltip
+        const from =
+          conn.from === "internet"
+            ? STATE.internetNode
+            : STATE.services.find((s) => s.id === conn.from);
+        const to =
+          conn.to === "internet"
+            ? STATE.internetNode
+            : STATE.services.find((s) => s.id === conn.to);
+        const fromName =
+          conn.from === "internet"
+            ? "Internet"
+            : from?.config?.name || "Unknown";
+        const toName =
+          conn.to === "internet" ? "Internet" : to?.config?.name || "Unknown";
+
+        showTooltip(
+          e.clientX + 15,
+          e.clientY + 15,
+          `<strong class="text-orange-400">Remove Link</strong><br>
                 <span class="text-gray-300">${fromName}</span> → <span class="text-gray-300">${toName}</span><br>
                 <span class="text-red-400 text-xs">Click to remove</span>`,
-      );
-    } else {
-      t.style.display = "none";
-    }
-    container.style.cursor = cursor;
-    return;
-  }
-
-  if (i.type === "service") {
-    const s = STATE.services.find((s) => s.id === i.id);
-    if (s) {
-      const load = s.processing.length / s.config.capacity;
-      let loadColor =
-        load > 0.8
-          ? "text-red-400"
-          : load > 0.4
-            ? "text-yellow-400"
-            : "text-green-400";
-
-      // Base tooltip content with static info
-      let content = `<strong class="text-blue-300">${s.config.name}</strong>`;
-      if (s.tier)
-        content += ` <span class="text-xs text-yellow-400">T${s.tier}</span>`;
-
-      // Show health percentage
-      const healthColor =
-        s.health < 40
-          ? "text-red-400"
-          : s.health < 70
-            ? "text-yellow-400"
-            : "text-green-400";
-      content += ` <span class="${healthColor}">${Math.round(
-        s.health,
-      )}%</span>`;
-
-      // Add static description and upkeep if available
-      if (s.config.tooltip) {
-        content += `<br><span class="text-xs text-gray-400">${s.config.tooltip.desc}</span>`;
-        content += `<br><span class="text-xs text-gray-500">Upkeep: <span class="text-gray-300">${s.config.tooltip.upkeep}</span></span>`;
+        );
+      } else {
+        t.style.display = "none";
       }
+      container.style.cursor = cursor;
+      return;
+    }
 
-      content += `<div class="mt-1 border-t border-gray-700 pt-1">`;
-
-      // Service-specific dynamic stats
-      if (s.type === "cache") {
-        const hitRate = Math.round((s.config.cacheHitRate || 0.35) * 100);
-        content += `Queue: <span class="${loadColor}">${s.queue.length}</span><br>
-                Load: <span class="${loadColor}">${s.processing.length}/${s.config.capacity}</span><br>
-                Hit Rate: <span class="text-green-400">${hitRate}%</span>`;
-      } else if (s.type === "sqs") {
-        const maxQ = s.config.maxQueueSize || 200;
-        const fillPercent = Math.round((s.queue.length / maxQ) * 100);
-        const status =
-          fillPercent > 80 ? "Critical" : fillPercent > 50 ? "Busy" : "Healthy";
-        const statusColor =
-          fillPercent > 80
+    if (i.type === "service") {
+      const s = STATE.services.find((s) => s.id === i.id);
+      if (s) {
+        const load = s.processing.length / s.config.capacity;
+        let loadColor =
+          load > 0.8
             ? "text-red-400"
-            : fillPercent > 50
+            : load > 0.4
               ? "text-yellow-400"
               : "text-green-400";
-        content += `Buffered: <span class="${loadColor}">${s.queue.length}/${maxQ}</span><br>
+
+        // Base tooltip content with static info
+        let content = `<strong class="text-blue-300">${s.config.name}</strong>`;
+        if (s.tier)
+          content += ` <span class="text-xs text-yellow-400">T${s.tier}</span>`;
+
+        // Show health percentage
+        const healthColor =
+          s.health < 40
+            ? "text-red-400"
+            : s.health < 70
+              ? "text-yellow-400"
+              : "text-green-400";
+        content += ` <span class="${healthColor}">${Math.round(
+          s.health,
+        )}%</span>`;
+
+        // Add static description and upkeep if available
+        if (s.config.tooltip) {
+          content += `<br><span class="text-xs text-gray-400">${s.config.tooltip.desc}</span>`;
+          content += `<br><span class="text-xs text-gray-500">Upkeep: <span class="text-gray-300">${s.config.tooltip.upkeep}</span></span>`;
+        }
+
+        content += `<div class="mt-1 border-t border-gray-700 pt-1">`;
+
+        // Service-specific dynamic stats
+        if (s.type === "cache") {
+          const hitRate = Math.round((s.config.cacheHitRate || 0.35) * 100);
+          content += `Queue: <span class="${loadColor}">${s.queue.length}</span><br>
+                Load: <span class="${loadColor}">${s.processing.length}/${s.config.capacity}</span><br>
+                Hit Rate: <span class="text-green-400">${hitRate}%</span>`;
+        } else if (s.type === "sqs") {
+          const maxQ = s.config.maxQueueSize || 200;
+          const fillPercent = Math.round((s.queue.length / maxQ) * 100);
+          const status =
+            fillPercent > 80
+              ? "Critical"
+              : fillPercent > 50
+                ? "Busy"
+                : "Healthy";
+          const statusColor =
+            fillPercent > 80
+              ? "text-red-400"
+              : fillPercent > 50
+                ? "text-yellow-400"
+                : "text-green-400";
+          content += `Buffered: <span class="${loadColor}">${s.queue.length}/${maxQ}</span><br>
                 Processing: ${s.processing.length}/${s.config.capacity}<br>
                 Status: <span class="${statusColor}">${status}</span>`;
-      } else {
-        content += `Queue: <span class="${loadColor}">${s.queue.length}</span><br>
-                Load: <span class="${loadColor}">${s.processing.length}/${s.config.capacity}</span>`;
-      }
-      content += `</div>`;
-
-      // Show upgrade option for upgradeable services
-      if (
-        (STATE.activeTool === "lambda" && s.type === "compute") ||
-        (STATE.activeTool === "db" && s.type === "db") ||
-        (STATE.activeTool === "cache" && s.type === "cache")
-      ) {
-        const tiers = CONFIG.services[s.type].tiers;
-        if (s.tier < tiers.length) {
-          cursor = "pointer";
-          const nextCost = tiers[s.tier].cost;
-          content += `<div class="mt-1 pt-1 border-t border-gray-700"><span class="text-green-300 text-xs font-bold">Upgrade: $${nextCost}</span></div>`;
-          if (s.mesh.material.emissive)
-            s.mesh.material.emissive.setHex(0x333333);
         } else {
-          content += `<div class="mt-1 pt-1 border-t border-gray-700"><span class="text-gray-500 text-xs">Max Tier</span></div>`;
+          content += `Queue: <span class="${loadColor}">${s.queue.length}</span><br>
+                Load: <span class="${loadColor}">${s.processing.length}/${s.config.capacity}</span>`;
         }
+        content += `</div>`;
+
+        // Show upgrade option for upgradeable services
+        if (
+          (STATE.activeTool === "lambda" && s.type === "compute") ||
+          (STATE.activeTool === "db" && s.type === "db") ||
+          (STATE.activeTool === "cache" && s.type === "cache")
+        ) {
+          const tiers = CONFIG.services[s.type].tiers;
+          if (s.tier < tiers.length) {
+            cursor = "pointer";
+            const nextCost = tiers[s.tier].cost;
+            content += `<div class="mt-1 pt-1 border-t border-gray-700"><span class="text-green-300 text-xs font-bold">Upgrade: $${nextCost}</span></div>`;
+            if (s.mesh.material.emissive)
+              s.mesh.material.emissive.setHex(0x333333);
+          } else {
+            content += `<div class="mt-1 pt-1 border-t border-gray-700"><span class="text-gray-500 text-xs">Max Tier</span></div>`;
+          }
+        }
+
+        showTooltip(e.clientX + 15, e.clientY + 15, content);
+
+        // Reset previous highlights
+        STATE.services.forEach((svc) => {
+          if (svc !== s && svc.mesh.material.emissive)
+            svc.mesh.material.emissive.setHex(0x000000);
+        });
       }
-
-      showTooltip(e.clientX + 15, e.clientY + 15, content);
-
-      // Reset previous highlights
+    } else {
+      t.style.display = "none";
+      // Reset highlights when not hovering service
       STATE.services.forEach((svc) => {
-        if (svc !== s && svc.mesh.material.emissive)
+        if (svc.mesh.material.emissive)
           svc.mesh.material.emissive.setHex(0x000000);
       });
     }
-  } else {
-    t.style.display = "none";
-    // Reset highlights when not hovering service
-    STATE.services.forEach((svc) => {
-      if (svc.mesh.material.emissive)
-        svc.mesh.material.emissive.setHex(0x000000);
-    });
-  }
 
-  container.style.cursor = cursor;
-});
+    container.style.cursor = cursor;
+  });
+}
 
 // Helper function for showing tooltips
 function showTooltip(x, y, html) {
@@ -2498,36 +2526,6 @@ function setupUITooltips() {
 // Call setup
 setupUITooltips();
 
-container.addEventListener("mouseup", (e) => {
-  if (e.button === 2 || e.button === 1) {
-    isPanning = false;
-    container.style.cursor = "default";
-  }
-  if (isDraggingNode && draggedNode) {
-    isDraggingNode = false;
-
-    const snapped = snapToGrid(draggedNode.position);
-
-    draggedNode.position.copy(snapped);
-
-    if (draggedNode.mesh) {
-      draggedNode.mesh.position.x = snapped.x;
-      draggedNode.mesh.position.z = snapped.z;
-    } else {
-      STATE.internetNode.mesh.position.x = snapped.x;
-      STATE.internetNode.mesh.position.z = snapped.z;
-      STATE.internetNode.ring.position.x = snapped.x;
-      STATE.internetNode.ring.position.z = snapped.z;
-    }
-
-    updateConnectionsForNode(draggedNode.id);
-
-    draggedNode = null;
-    container.style.cursor = "default";
-    return;
-  }
-});
-
 function updateConnectionsForNode(nodeId) {
   STATE.connections.forEach((c) => {
     if (c.from === nodeId || c.to === nodeId) {
@@ -2553,16 +2551,24 @@ function updateConnectionsForNode(nodeId) {
   });
 }
 
-function animate(time) {
-  STATE.animationId = requestAnimationFrame(animate);
-  if (!STATE.isRunning) return;
+function tick(deltaSeconds = 0) {
+  if (!scene || !renderer || !camera) return;
+
+  // Render a static frame behind the menu before the game starts.
+  if (!STATE.gameStarted) {
+    renderer.render(scene, camera);
+    return;
+  }
+
+  if (!STATE.isRunning) {
+    renderer.render(scene, camera);
+    return;
+  }
 
   // Limit dt to prevent huge jumps when tab loses focus
-  // (requestAnimationFrame pauses when tab is inactive)
-  const rawDt = (time - STATE.lastTime) / 1000;
-  const clampedDt = Math.min(rawDt, 0.1); // Max 100ms per frame
+  const clampedDt = Math.min(deltaSeconds, 0.1); // Max 100ms per frame
   const dt = clampedDt * STATE.timeScale;
-  STATE.lastTime = time;
+  STATE.lastTime = performance.now();
   STATE.elapsedGameTime += dt;
 
   // Keyboard panning
@@ -3015,12 +3021,16 @@ function analyzeFailure() {
 
 window.addEventListener("resize", () => {
   const aspect = window.innerWidth / window.innerHeight;
-  camera.left = -d * aspect;
-  camera.right = d * aspect;
-  camera.top = d;
-  camera.bottom = -d;
+  camera.left = -ORTHO_SIZE * aspect;
+  camera.right = ORTHO_SIZE * aspect;
+  camera.top = ORTHO_SIZE;
+  camera.bottom = -ORTHO_SIZE;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+
+  if (window.PHASER_GAME?.scale) {
+    window.PHASER_GAME.scale.resize(window.innerWidth, window.innerHeight);
+  }
 });
 
 document.addEventListener("keydown", (event) => {
@@ -3191,47 +3201,31 @@ window.resumeGame = () => {
 
 // ==================== SAVE/LOAD FUNCTIONS ====================
 
-function saveGameStateFunction() {
-  const saveData = {
-    timestamp: Date.now(),
-    version: "2.0",
-    ...STATE,
-    score: { ...STATE.score },
-    trafficDistribution: { ...STATE.trafficDistribution },
-    services: STATE.services.map((service) => ({
-      id: service.id,
-      type: service.type,
-      position: [service.position.x, service.position.y, service.position.z],
-      connections: [...service.connections],
-      tier: service.tier,
-      cacheHitRate: service.config.cacheHitRate || null,
-    })),
-    connections: STATE.connections.map((conn) => ({
-      from: conn.from,
-      to: conn.to,
-    })),
-    requests: [],
-    internetConnections: [...STATE.internetNode.connections],
-  };
-
-  localStorage.setItem("serverSurvivalSave", JSON.stringify(saveData));
-}
-
-const FIVE_MINUTES = 5 * 60 * 1000;
-
-setInterval(() => {
-  if (!document.hidden) {
-    try {
-      saveGameStateFunction();
-    } catch (error) {
-      console.error("Failed to save game: ", error);
-    }
-  }
-}, FIVE_MINUTES);
-
 window.saveGameState = () => {
   try {
-    saveGameStateFunction();
+    const saveData = {
+      timestamp: Date.now(),
+      version: "2.0",
+      ...STATE,
+      score: { ...STATE.score },
+      trafficDistribution: { ...STATE.trafficDistribution },
+      services: STATE.services.map((service) => ({
+        id: service.id,
+        type: service.type,
+        position: [service.position.x, service.position.y, service.position.z],
+        connections: [...service.connections],
+        tier: service.tier,
+        cacheHitRate: service.config.cacheHitRate || null,
+      })),
+      connections: STATE.connections.map((conn) => ({
+        from: conn.from,
+        to: conn.to,
+      })),
+      requests: [],
+      internetConnections: [...STATE.internetNode.connections],
+    };
+
+    localStorage.setItem("serverSurvivalSave", JSON.stringify(saveData));
 
     const saveBtn = document.getElementById("btn-save");
     const originalColor = saveBtn.classList.contains("hover:border-green-500")
@@ -3387,10 +3381,6 @@ window.loadGameState = () => {
     }
 
     document.getElementById("main-menu-modal").classList.add("hidden");
-
-    if (!STATE.animationId) {
-      animate(performance.now());
-    }
 
     STATE.sound.playPlace();
   } catch (error) {
