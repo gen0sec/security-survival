@@ -35,7 +35,7 @@ const TUTORIAL_STEPS = [
     {
         id: 'place-firewall',
         title: 'Deploy Firewall',
-        text: 'The <span class="text-purple-400 font-bold">Firewall</span> is your first line of defense. It blocks <span class="text-red-400">MALICIOUS</span> traffic (red) that can destroy your reputation. Click the FW button, then click on the grid to place it.',
+        text: 'The <span class="text-purple-400 font-bold">Firewall</span> is your first line of defense. It blocks <span class="text-red-400">MALICIOUS</span> traffic (red) that can destroy your reputation. Click the Firewall button, then click on the grid to place it.',
         icon: '🛡️',
         highlight: 'tool-waf',
         action: 'place_waf',
@@ -52,21 +52,21 @@ const TUTORIAL_STEPS = [
     },
     {
         id: 'place-lb',
-        title: 'Deploy Load Balancer',
-        text: 'The <span class="text-blue-400 font-bold">Load Balancer</span> distributes traffic across multiple servers. This prevents overload and improves reliability.',
+        title: 'Deploy Proxy',
+        text: 'The <span class="text-blue-400 font-bold">Proxy</span> distributes traffic across multiple servers. This prevents overload and improves reliability.',
         icon: '⚖️',
         highlight: 'tool-alb',
         action: 'place_alb',
-        hint: 'Load Balancers use Round Robin to evenly distribute requests.'
+        hint: 'Proxys use Round Robin to evenly distribute requests.'
     },
     {
         id: 'connect-fw-lb',
         title: 'Connect Firewall to LB',
-        text: 'Connect your Firewall to the Load Balancer. Clean traffic will flow from Firewall → Load Balancer.',
+        text: 'Connect your Firewall to the Proxy. Clean traffic will flow from Firewall → Proxy.',
         icon: '🔗',
         highlight: 'tool-connect',
         action: 'connect_waf_alb',
-        hint: 'Traffic flow: Internet → Firewall (blocks MALICIOUS) → Load Balancer → ...'
+        hint: 'Traffic flow: Internet → Firewall (blocks MALICIOUS) → Proxy → ...'
     },
     {
         id: 'place-compute',
@@ -80,11 +80,11 @@ const TUTORIAL_STEPS = [
     {
         id: 'connect-lb-compute',
         title: 'Connect LB to Compute',
-        text: 'Connect the Load Balancer to your Compute server.',
+        text: 'Connect the Proxy to your Compute server.',
         icon: '🔗',
         highlight: 'tool-connect',
         action: 'connect_alb_compute',
-        hint: 'You can add multiple Compute servers and the Load Balancer will distribute traffic between them.'
+        hint: 'You can add multiple Compute servers and the Proxy will distribute traffic between them.'
     },
     {
         id: 'place-storage',

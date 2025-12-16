@@ -730,11 +730,85 @@ function updateFinancesDisplay() {
         expenseHtml;
     }
 
-    // Auto-repair overhead (if enabled)
-    if (f.expenses.autoRepair > 0) {
-      expenseHtml += `<div class="flex justify-between mt-1 pt-1 border-t border-gray-700"><span class="text-orange-400">Auto-Repair</span><span class="text-gray-300">$${Math.floor(
-        f.expenses.autoRepair,
-      )}</span></div>`;
+    // Update income total
+    const incomeTotal = document.getElementById("income-total");
+    if (incomeTotal)
+      incomeTotal.textContent = `$${Math.floor(f.income.total || 0)}`;
+
+    // Expense categories - services with costs
+    const serviceTypes = [
+      { key: "waf", color: "text-red-400", cost: CONFIG.services.waf.cost },
+      { key: "alb", color: "text-blue-400", cost: CONFIG.services.alb.cost },
+      {
+        key: "compute",
+        color: "text-green-400",
+        cost: CONFIG.services.compute.cost,
+      },
+      {
+        key: "db",
+        color: "text-yellow-400",
+        cost: CONFIG.services.db.cost,
+      },
+      {
+        key: "s3",
+        color: "text-purple-400",
+        cost: CONFIG.services.s3.cost,
+      },
+      {
+        key: "cache",
+        color: "text-orange-400",
+        cost: CONFIG.services.cache.cost,
+      },
+      { key: "sqs", color: "text-cyan-400", cost: CONFIG.services.sqs.cost },
+    ];
+
+    const repairPercent =
+      CONFIG.survival.degradation?.repairCostPercent || 0.15;
+
+    // Update expense details with service cost, repair cost and count
+    const expenseDetails = document.getElementById("expense-details");
+    if (expenseDetails) {
+      let expenseHtml = "";
+
+      // Breakdown by service type (includes purchase + upkeep + repairs)
+      let hasServiceExpenses = false;
+      serviceTypes.forEach((t) => {
+        const value = f.expenses.byService[t.key] || 0;
+        const count = f.expenses.countByService[t.key] || 0;
+        const repairCost = Math.ceil(t.cost * repairPercent);
+        const label = CONFIG.services[t.key]?.name || t.key.toUpperCase();
+        if (value > 0 || count > 0) {
+          hasServiceExpenses = true;
+          expenseHtml += `<div class="grid grid-cols-5 gap-1"><span class="${
+            t.color
+          }">${
+            label
+          }</span><span class="text-center text-gray-500">${count}</span><span class="text-center text-gray-400">$${
+            t.cost
+          }</span><span class="text-center text-yellow-400">$${repairCost}</span><span class="text-right text-gray-300">$${Math.floor(
+            value,
+          )}</span></div>`;
+        }
+      });
+
+      // Add header if we have service expenses
+      if (hasServiceExpenses) {
+        expenseHtml =
+          '<div class="grid grid-cols-5 gap-1 text-gray-500 mb-1 text-[10px]"><span>Service</span><span class="text-center">#</span><span class="text-center">Cost</span><span class="text-center">Repair</span><span class="text-right">Spent</span></div>' +
+          expenseHtml;
+      }
+
+      // Auto-repair overhead (if enabled)
+      if (f.expenses.autoRepair > 0) {
+        expenseHtml += `<div class="flex justify-between mt-1 pt-1 border-t border-gray-700"><span class="text-orange-400">Auto-Repair</span><span class="text-gray-300">$${Math.floor(
+          f.expenses.autoRepair,
+        )}</span></div>`;
+      }
+
+      if (!expenseHtml) {
+        expenseHtml = '<div class="text-gray-600 italic">No expenses yet</div>';
+      }
+      expenseDetails.innerHTML = expenseHtml;
     }
 
     if (!expenseHtml) {
@@ -2556,6 +2630,7 @@ function tick(deltaSeconds = 0) {
     // Determine failure reason and generate tips
     const failureAnalysis = analyzeFailure();
 
+    saveUserScore();
     document.getElementById("modal-title").innerText = "SYSTEM FAILURE";
     document.getElementById("modal-title").classList.add("text-red-500");
     document.getElementById("modal-desc").innerHTML = `
@@ -2620,25 +2695,8 @@ function analyzeFailure() {
       result.tips.push("Add a Firewall as your first line of defense");
       result.tips.push("Multiple Firewalls can handle traffic spikes better");
     } else {
-      const worstFailure = Object.entries(STATE.failures)
-        .filter(([k]) => k !== "MALICIOUS")
-        .sort((a, b) => b[1] - a[1])[0];
-
-      if (worstFailure && worstFailure[1] > 0) {
-        result.description = `Too many ${worstFailure[0]} requests failed (${worstFailure[1]} failures). Failed requests damage your reputation.`;
-
-        if (worstFailure[0] === "STATIC" || worstFailure[0] === "UPLOAD") {
-          result.tips.push(
-            "Add more S3 Storage nodes for STATIC/UPLOAD traffic",
-          );
-        } else {
-          result.tips.push("Add more Database nodes or upgrade existing ones");
-          result.tips.push("Use Cache to reduce database load");
-        }
-      } else {
-        result.description =
-          "Requests were failing faster than your infrastructure could handle.";
-      }
+      result.tips.push("Add more Database nodes or upgrade existing ones");
+      result.tips.push("Use Cache to reduce database load");
     }
 
     result.tips.push("Add Queue (SQS) to buffer traffic during spikes");
@@ -2671,6 +2729,17 @@ function analyzeFailure() {
     result.tips.push("Use Cache to speed up request processing");
     result.tips.push("Cheaper services (Firewall, S3) have lower upkeep");
   }
+
+  // Add general tips based on game state
+  if (STATE.services.length < 3) {
+    result.tips.push(
+      "Build a complete pipeline: Firewall → Load Balancer → Compute → DB/S3",
+    );
+  }
+
+  result.tips.push("Focus on processing more requests to increase income");
+  result.tips.push("Use Cache to speed up request processing");
+  result.tips.push("Cheaper services (Firewall, S3) have lower upkeep");
 
   // Add general tips based on game state
   if (STATE.services.length < 3) {
