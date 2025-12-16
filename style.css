@@ -8,10 +8,17 @@ body {
 }
 
 #canvas-container {
-  position: relative;
+  position: fixed;
+  inset: 0;
+  z-index: 0;
   width: 100vw;
   height: 100vh;
   overflow: hidden;
+}
+
+#canvas-container canvas {
+  position: absolute;
+  inset: 0;
 }
 
 /* Glassmorphism UI */
