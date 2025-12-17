@@ -3178,15 +3178,17 @@ async function logoutUser() {
   }
 }
 
-window.supabase.auth.onAuthStateChange((event, session) => {
-  if (session) {
-    document.getElementById("sign-out-btn").classList.remove("hidden");
-    document.getElementById("auth-btn").classList.add("hidden");
-  } else {
-    document.getElementById("sign-out-btn").classList.add("hidden");
-    document.getElementById("auth-btn").classList.remove("hidden");
-  }
-});
+if (window.supabase?.auth) {
+  window.supabase.auth.onAuthStateChange((event, session) => {
+    if (session) {
+      document.getElementById("sign-out-btn")?.classList.remove("hidden");
+      document.getElementById("auth-btn")?.classList.add("hidden");
+    } else {
+      document.getElementById("sign-out-btn")?.classList.add("hidden");
+      document.getElementById("auth-btn")?.classList.remove("hidden");
+    }
+  });
+}
 
 async function oauthLogin(provider) {
   try {
@@ -3396,3 +3398,61 @@ function saveSettings() {
     closeSettings();
   }, 1200);
 }
+
+//DIFFICULTY AND THEME SETTINGS
+let selectedDifficulty = null;
+let selectedTheme = null;
+
+function openPregameModal() {
+  document.getElementById("pregame-modal").classList.remove("hidden");
+  document.getElementById("main-menu-modal").classList.add("hidden");
+}
+
+function closePregameModal() {
+  document.getElementById("pregame-modal").classList.add("hidden");
+}
+
+function setActive(button, groupSelector) {
+  document.querySelectorAll(groupSelector).forEach((b) => {
+    b.classList.remove("bg-blue-600", "border-blue-400", "hover:bg-blue-500");
+    b.classList.add("bg-gray-800", "border-gray-700", "hover:bg-gray-700");
+  });
+
+  button.classList.remove(
+    "bg-gray-800",
+    "border-gray-700",
+    "hover:bg-gray-700",
+  );
+  button.classList.add("bg-blue-600", "border-blue-400", "hover:bg-blue-500");
+}
+
+document.querySelectorAll(".difficulty-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    selectedDifficulty = btn.dataset.difficulty;
+    setActive(btn, ".difficulty-btn");
+    updateStartButtonState();
+  });
+});
+
+document.querySelectorAll(".theme-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    selectedTheme = btn.dataset.theme;
+    setActive(btn, ".theme-btn");
+    updateStartButtonState();
+  });
+});
+
+function updateStartButtonState() {
+  const btn = document.getElementById("start-game-confirm");
+  const ready = selectedDifficulty && selectedTheme;
+
+  btn.disabled = !ready;
+  btn.classList.toggle("opacity-50", !ready);
+  btn.classList.toggle("cursor-not-allowed", !ready);
+}
+
+document.getElementById("start-game-confirm").addEventListener("click", () => {
+  window.setupConfig(selectedTheme, selectedDifficulty);
+  closePregameModal();
+  resetGame("survival");
+});
