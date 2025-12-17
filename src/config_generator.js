@@ -127,6 +127,7 @@ Helpful tips:
 3. Try to balance the shifts and events, but match them to the difficulty. Multipliers should have big swings, for example: 1-3 times is low difficulty, 4-6 is medium, and 6-10 is hard.
 4. Be sure to generate at least one event per type and at least 4 different traffic shift types, but more is preffered.
 5. The descriptions of the events should be fairly short and describe what is happening in the values too.
+6. Names appear as is to the user. Don't use _ or - to separate words and make them descriptive.
 You must always follow the following output schema and only replay with the correct JSON object:
 {
   "randomEvents": [

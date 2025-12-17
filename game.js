@@ -250,12 +250,12 @@ function addInterventionWarning(message, type = "warning", duration = 4000) {
 
 function updateTrafficShift(dt) {
   if (STATE.gameMode !== "survival") return;
-  if (!CONFIG.survival.trafficShift?.enabled) return;
+  if (!CONFIG.survival.trafficShifts?.enabled) return;
   if (!STATE.intervention) return;
 
   STATE.intervention.trafficShiftTimer += dt;
 
-  const config = CONFIG.survival.trafficShift;
+  const config = CONFIG.survival.trafficShifts;
   const interval = config.interval;
   const duration = config.duration;
 
@@ -280,8 +280,8 @@ function updateTrafficShift(dt) {
 function startTrafficShift() {
   if (!STATE.intervention || STATE.maliciousSpikeActive) return;
 
-  const config = CONFIG.survival.trafficShift;
-  const shifts = config.shifts;
+  const config = CONFIG.survival.trafficShifts;
+  const shifts = config.patterns;
 
   // Pick a random shift
   const shift = shifts[Math.floor(Math.random() * shifts.length)];
@@ -291,27 +291,11 @@ function startTrafficShift() {
   // Store original distribution
   STATE.intervention.originalTrafficDist = { ...STATE.trafficDistribution };
 
-  // Apply the shift
-  const newDist = { ...STATE.trafficDistribution };
-  const boostAmount = 0.25; // Boost the specified type by 25%
-
-  // Reduce all others proportionally to make room
-  const totalOthers = Object.entries(newDist)
-    .filter(([key]) => key !== shift.type)
-    .reduce((sum, [, val]) => sum + val, 0);
-
-  Object.keys(newDist).forEach((key) => {
-    if (key === shift.type) {
-      newDist[key] = Math.min(0.6, newDist[key] + boostAmount);
-    } else {
-      newDist[key] *= 1 - boostAmount / totalOthers;
-    }
-  });
-
-  STATE.trafficDistribution = newDist;
+  // Apply the pattern distribution directly
+  STATE.trafficDistribution = { ...shift.distribution };
 
   addInterventionWarning(
-    `📊 ${shift.name} - ${shift.type} traffic surging!`,
+    `Traffic shifts! ${shift.name}!`,
     "warning",
     5000,
   );
@@ -341,12 +325,23 @@ function updateRandomEvents(dt) {
 
   const config = CONFIG.survival.randomEvents;
 
+  // Schedule the next interval between min/max (seconds)
+  if (!STATE.intervention.nextRandomEventInterval) {
+    STATE.intervention.nextRandomEventInterval =
+      config.minInterval +
+      Math.random() * (config.maxInterval - config.minInterval);
+  }
+
   // Check if event should trigger
-  if (STATE.intervention.randomEventTimer >= config.checkInterval) {
+  if (STATE.intervention.randomEventTimer >= STATE.intervention.nextRandomEventInterval) {
+    // reset timer and schedule next interval regardless of whether we can trigger
     STATE.intervention.randomEventTimer = 0;
+    STATE.intervention.nextRandomEventInterval =
+      config.minInterval +
+      Math.random() * (config.maxInterval - config.minInterval);
 
     // 30% chance to trigger an event
-    if (Math.random() < 0.3) {
+    if (!STATE.intervention.activeEvent && Math.random() < 0.3) {
       triggerRandomEvent();
     }
   }
@@ -364,42 +359,48 @@ function triggerRandomEvent() {
   if (!STATE.intervention || STATE.intervention.activeEvent) return;
 
   const config = CONFIG.survival.randomEvents;
-  const eventType =
-    config.types[Math.floor(Math.random() * config.types.length)];
-  const duration = 30000; // 30 second events
+  const selectedEvent = config.events[Math.floor(Math.random() * config.events.length)];
 
-  STATE.intervention.activeEvent = eventType;
-  STATE.intervention.eventEndTime = Date.now() + duration;
-  STATE.intervention.eventDuration = duration;
+  // Use configured duration (seconds) when available, fallback to 30s
+  const durationMs = (selectedEvent.duration ?? 30) * 1000;
 
-  switch (eventType) {
+  // Mark active event and schedule when it should end
+  STATE.intervention.activeEvent = selectedEvent.type;
+  STATE.intervention.eventEndTime = Date.now() + durationMs;
+  STATE.intervention.eventDuration = durationMs;
+
+  // Reset the random event timer
+  STATE.intervention.randomEventTimer = 0;
+  STATE.intervention.nextRandomEventInterval = null;
+
+  switch (selectedEvent.type) {
     case "COST_SPIKE":
       addInterventionWarning(
-        "💰 CLOUD COST SPIKE! Upkeep doubled for 30s",
+        `${selectedEvent.name}! ${selectedEvent.description}`,
         "danger",
         8000,
       );
-      STATE.intervention.costMultiplier = 2.0;
+      STATE.intervention.costMultiplier = selectedEvent.multiplier;
       break;
 
     case "CAPACITY_DROP":
       addInterventionWarning(
-        "⚡ RESOURCE THROTTLING! Capacity reduced for 30s",
+        `${selectedEvent.name}! ${selectedEvent.description}`,
         "danger",
         8000,
       );
       STATE.services.forEach((s) => {
-        s.tempCapacityReduction = 0.5; // 50% capacity
+        s.tempCapacityReduction = selectedEvent.multiplier;
       });
       break;
 
     case "TRAFFIC_BURST":
       addInterventionWarning(
-        "🚀 TRAFFIC BURST! 3× requests for 30s",
+        `${selectedEvent.name}! ${selectedEvent.description}`,
         "warning",
         8000,
       );
-      STATE.intervention.trafficBurstMultiplier = 3.0;
+      STATE.intervention.trafficBurstMultiplier = selectedEvent.rpsMultiplier;
       break;
 
     case "SERVICE_OUTAGE":
@@ -411,7 +412,7 @@ function triggerRandomEvent() {
         target.mesh.material.opacity = 0.3;
         target.mesh.material.transparent = true;
         addInterventionWarning(
-          `🔧 ${target.type.toUpperCase()} OUTAGE! Service offline for 30s`,
+          `${selectedEvent.name}! ${selectedEvent.description} ${target.type.toUpperCase()} OUTAGE!`,
           "danger",
           8000,
         );
@@ -420,7 +421,7 @@ function triggerRandomEvent() {
   }
 
   // Show active event bar
-  showActiveEventBar(eventType);
+  showActiveEventBar(selectedEvent.type);
 
   STATE.sound?.playTone(300, "sawtooth", 0.3);
 }
