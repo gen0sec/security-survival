@@ -82,6 +82,7 @@ const STATE = {
         randomEventTimer: 0,
         activeEvent: null,
         eventEndTime: 0,
+        nextRandomEventInterval: null,
         
         // RPS milestone tracking
         currentMilestoneIndex: 0,
